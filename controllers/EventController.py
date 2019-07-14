@@ -36,6 +36,14 @@ class BaseEvent(ABC):
     def unsubscribe(self, consumer_id, producer_id):
         pass
 
+    def create_cache_name(self, id):
+        """
+        create cache name for an id
+        :param id: target id
+        :return: string cache name
+        """
+        return f"{id}:{self.name}"
+
     @property
     def verbs(self):
         return self._verbs
@@ -70,9 +78,16 @@ class Flat(BaseEvent):
         :param payload: json payload { actor_id, item_id }
         :return: True on success
         """
-        pass
+        # 1. delete instance from database
+        (self._dataset
+         .delete()
+         .where(
+            (self._dataset.actor_id == payload.get('actor_id')) &
+            (self._dataset.item_id == payload.get('item_id')))
+         .execute())
+        # todo 2. queue fan out
+        return True
 
-    @abstractmethod
     def subscribe(self, consumer_id, producer_id):
         """
         subscribe a consumer to a producer
@@ -88,7 +103,6 @@ class Flat(BaseEvent):
         # 2. todo broadcast update timeline
         return True
 
-    @abstractmethod
     def unsubscribe(self, consumer_id, producer_id):
         """
         unsubscribe a consumer from a producer
@@ -104,6 +118,26 @@ class Flat(BaseEvent):
          .execute())
         # 2. todo broadcast update timeline
         return True
+
+    def _delete_from_producer_for_consumer(self):
+        # for unsubscribe
+        pass
+
+    def _add_from_producer_to_consumer(self):
+        # for subscribe
+        pass
+
+    def _publish_fan_out_from_producer(self):
+        # for publishing content
+        pass
+
+    def _delete_fan_out_from_producer(self):
+        # for retracting content
+        pass
+
+    def _recreate_user_timeline(self):
+        # to recreate a timeline
+        pass
 
 
 class Activity(BaseEvent):
@@ -143,7 +177,6 @@ class Activity(BaseEvent):
         # todo queue fan out removal process
         return True
 
-    @abstractmethod
     def subscribe(self, consumer_id, producer_id):
         """
         subscribe a consumer to a producer
@@ -159,7 +192,6 @@ class Activity(BaseEvent):
         # 2. todo broadcast update timeline
         return True
 
-    @abstractmethod
     def unsubscribe(self, consumer_id, producer_id):
         """
         unsubscribe a consumer from a producer
@@ -175,6 +207,26 @@ class Activity(BaseEvent):
          .execute())
         # 2. todo broadcast update timeline
         return True
+
+    def _delete_from_producer_for_consumer(self):
+        # for unsubscribe
+        pass
+
+    def _add_from_producer_to_consumer(self):
+        # for subscribe
+        pass
+
+    def _publish_fan_out_from_producer(self):
+        # for publishing content
+        pass
+
+    def _delete_fan_out_from_producer(self):
+        # for retracting content
+        pass
+
+    def _recreate_user_timeline(self):
+        # to recreate a timeline
+        pass
 
 
 class EventProcessor:
