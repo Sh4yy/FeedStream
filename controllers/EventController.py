@@ -1,9 +1,6 @@
 from abc import ABC, abstractmethod
 from peewee import chunked
-from redis import Redis
-
-
-redis = Redis()
+from utils import redis
 
 
 class BaseEvent(ABC):

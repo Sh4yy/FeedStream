@@ -1,10 +1,11 @@
 from peewee import *
+from utils import db
 
 
 class BaseModel(Model):
 
     class Meta:
-        db = None
+        db = db
 
 
 class Relation(Model):

@@ -1,5 +1,7 @@
 from controllers import Activity, Flat, EventProcessor, TaskQueue
-from models import ActivityEvent, FlatEvent, Relation
+from models import ActivityEvent, FlatEvent, Relation, BaseModel
+from sanic import Sanic
+from utils import db
 
 
 def setup_system():
@@ -39,6 +41,8 @@ def setup_workers():
 
 def setup_database():
     """ setup cache and database """
+
+    db.create_tables(BaseModel.__subclasses__())
 
 
 def setup_web_server():
