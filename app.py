@@ -1,4 +1,4 @@
-from controllers import Activity, Flat, EventProcessor
+from controllers import Activity, Flat, EventProcessor, TaskQueue
 from models import ActivityEvent, FlatEvent, Relation
 
 
@@ -29,8 +29,16 @@ def setup_system():
     ))
 
 
+def setup_workers():
+    """ Setup task queue and workers """
+
+    task_queue = TaskQueue(workers=1)
+    EventProcessor.register_task_queue(task_queue)
+    task_queue.start_workers()
+
+
 def setup_database():
-    pass
+    """ setup cache and database """
 
 
 def setup_web_server():

@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from peewee import chunked
 from redis import Redis
 
+
 redis = Redis()
 
 
@@ -422,83 +423,3 @@ class Activity(BaseEvent):
         return True
 
 
-class EventProcessor:
-    events = []
-    event_by_verb = {}
-    event_by_name = {}
-
-    @classmethod
-    def register_event_handler(cls, event: BaseEvent):
-        """
-        register a new event
-        :param event: new event
-        :return: True on success
-        """
-        cls.events.append(event)
-        cls.event_by_name[event.name] = event
-        for verb in event.verbs:
-            cls.event_by_verb.setdefault(verb, [])
-            cls.event_by_verb[verb].append(event)
-
-    @classmethod
-    def add_event(cls, payload):
-        """
-        register new event
-        :param payload: json payload
-        :return: True on success
-        """
-        if 'verb' not in payload:
-            raise Exception('invalid payload; missing verb')
-
-        for event_handler in cls.event_by_verb[payload['verb']]:
-            event_handler.add_event(payload)
-
-        return True
-
-    @classmethod
-    def retract_event(cls, payload):
-        """
-        retract an event
-        :param payload: json payload
-        :return: True on success
-        """
-
-        if 'verb' not in payload:
-            raise Exception('invalid payload; missing verb')
-
-        for event_handler in cls.event_by_verb[payload['verb']]:
-            event_handler.retract_event(payload)
-
-        return True
-
-    @classmethod
-    def subscribe(cls, event_name, consumer_id, producer_id):
-        """
-        subscribe follower to producer
-        :param event_name: event's name
-        :param consumer_id: consumer's id
-        :param producer_id: producer's id
-        :return: True on success
-        """
-
-        if event_name not in cls.event_by_name:
-            raise Exception('invalid event name')
-
-        cls.event_by_name[event_name].subscribe(consumer_id, producer_id)
-        return True
-
-    @classmethod
-    def unsubscribe(cls, event_name, consumer_id, producer_id):
-        """
-        unsubscribe follower from producer
-        :param event_name: event's name
-        :param consumer_id: consumer's id
-        :param producer_id: producer's id
-        :return: True on success
-        """
-
-        if event_name not in cls.event_by_name:
-            raise Exception('invalid event name')
-
-        cls.event_by_name[event_name].unsubscribe(consumer_id, producer_id)
-        return True

@@ -1,1 +1,3 @@
-from .EventController import Flat, Activity, EventProcessor
+from .EventController import Flat, Activity
+from .EventProcessor import EventProcessor
+from .TaskQueue import TaskQueue
