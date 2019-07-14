@@ -1,1 +1,1 @@
-from .EventController import Flat, Activity
+from .EventController import Flat, Activity, EventProcessor

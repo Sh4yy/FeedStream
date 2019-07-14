@@ -1,4 +1,4 @@
-from controllers import Activity, Flat
+from controllers import Activity, Flat, EventProcessor
 from models import ActivityEvent, FlatEvent, Relation
 
 
@@ -16,13 +16,17 @@ def setup_system():
         """ notification items data set """
 
     # register feeds
-    Flat(name='feed', dataset=FeedPosts,
-         relations=UserRelations, verbs=['podcast'],
-         include_actor=True, max_cache=500).register()
+    (EventProcessor.register_event_handler(
+        Flat(name='feed', dataset=FeedPosts,
+             relations=UserRelations, verbs=['podcast'],
+             include_actor=True, max_cache=500)
+    ))
 
-    Activity(name='notification', dataset=NotificationPosts,
-             relations=UserRelations, verbs=['like', 'follow', 'comment', 'mention'],
-             include_actor=False, max_cache=200).register()
+    (EventProcessor.register_event_handler(
+        Activity(name='notification', dataset=NotificationPosts,
+                 relations=UserRelations, verbs=['like', 'follow', 'comment', 'mention'],
+                 include_actor=False, max_cache=200)
+    ))
 
 
 def setup_database():
