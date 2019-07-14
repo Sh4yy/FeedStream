@@ -1,4 +1,9 @@
 from abc import ABC, abstractmethod
+from peewee import chunked
+from redis import Redis
+
+
+redis = Redis()
 
 
 class BaseEvent(ABC):
@@ -22,19 +27,19 @@ class BaseEvent(ABC):
 
     @abstractmethod
     def add_event(self, payload):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def retract_event(self, payload):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def subscribe(self, consumer_id, producer_id):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def unsubscribe(self, consumer_id, producer_id):
-        pass
+        raise NotImplementedError()
 
     def create_cache_name(self, id):
         """
@@ -119,25 +124,112 @@ class Flat(BaseEvent):
         # 2. todo broadcast update timeline
         return True
 
-    def _delete_from_producer_for_consumer(self):
-        # for unsubscribe
-        pass
+    def _delete_from_producer_for_consumer(self, producer_id, consumer_id):
+        """
+        for unsubscribe events.
+        :param producer_id: producer's id
+        :param consumer_id: consumer's id
+        :return: True on success
+        """
+        # get producer's recent content (need to figure out how many)
+        content_id = (self._dataset
+                          .select(self._dataset.item_id)
+                          .where((self._dataset.actor_id == producer_id)))
 
-    def _add_from_producer_to_consumer(self):
-        # for subscribe
-        pass
+        # inject to consumer's feed list
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content_id, 400):
+            redis.zrem(consumer_feed, chunk)
 
-    def _publish_fan_out_from_producer(self):
-        # for publishing content
-        pass
+        return True
 
-    def _delete_fan_out_from_producer(self):
-        # for retracting content
-        pass
+    def _add_from_producer_to_consumer(self, producer_id, consumer_id):
+        """
+        for subscribe events.
+        :return: True on success
+        """
+        # get producer's content
+        content = (self._dataset
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .where((self._dataset.actor_id == producer_id))
+                   .namedtuple())
 
-    def _recreate_user_timeline(self):
-        # to recreate a timeline
-        pass
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content, 400):
+            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+
+        return True
+
+    def _publish_fan_out_from_producer(self, producer_id, item_id):
+        """
+        for when a consumer publishes new content
+        :return: True on success
+        """
+        # get producer's followers
+        followers = (self._relations
+                         .select(self._relations.subscriber_id)
+                         .where(self._relations.producer_id == producer_id))
+
+        content = self._dataset.get(self._dataset.item_id == item_id)
+        content_info = {content.item_id, content.timestamp}
+
+        # inject content id to their list
+        for follower in followers:
+            redis.zadd(self.create_cache_name(follower), content_info)
+
+        if self._include_actor:
+            redis.zadd(self.create_cache_name(producer_id), content_info)
+
+        return True
+
+    def _delete_fan_out_from_producer(self, producer_id, item_id):
+        """
+        for when a producer retracts their content
+        :return: True on success
+        """
+        # get producer's followers
+        followers = (self._relations
+                     .select(self._relations.subscriber_id)
+                     .where(self._relations.producer_id == producer_id))
+
+        # inject content id to their list
+        for follower in followers:
+            redis.zrem(self.create_cache_name(follower), [item_id])
+
+        if self._include_actor:
+            redis.zrem(self.create_cache_name(producer_id), [item_id])
+
+        return True
+
+    def _recreate_user_timeline(self, consumer_id):
+        """
+        for when (server restarts, or a new user logs in)
+        :return: True on success
+        """
+        # get following producers content
+        content = (self._dataset
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .join(self._relations, on=self._relations.producer_id == self._dataset.actor_id)
+                       .where(self._relations.consumer_id == consumer_id)
+                       .namedtuple())
+
+        # inject into user's list
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content, 400):
+            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+
+        if not self._include_actor:
+            return True
+
+        content = (self._dataset
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .where(self._dataset.actor_id == consumer_id)
+                       .namedtuple())
+
+        for chunk in chunked(content, 400):
+            redis.zadd(consumer_id, dict((c.item_id, c.timestamp) for c in chunk))
+
+        return True
 
 
 class Activity(BaseEvent):
