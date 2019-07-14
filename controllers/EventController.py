@@ -300,25 +300,87 @@ class Activity(BaseEvent):
         # 2. todo broadcast update timeline
         return True
 
-    def _delete_from_producer_for_consumer(self):
-        # for unsubscribe
-        pass
+    def _delete_from_producer_for_consumer(self, consumer_id, producer_id):
+        """
+        for unsubscribe
+        :param consumer_id: consumer's id
+        :param producer_id: producer's id
+        :return: True on success
+        """
+        # get items from producer for consumer
+        content_ids = (self._dataset
+                           .select(self._dataset.item_id)
+                           .where(
+                                (self._dataset.actor_id == producer_id) &
+                                (self._dataset.target_id == consumer_id)))
 
-    def _add_from_producer_to_consumer(self):
-        # for subscribe
-        pass
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content_ids, 400):
+            # remove from consumer cache
+            redis.zrem(consumer_feed, chunk)
 
-    def _publish_fan_out_from_producer(self):
-        # for publishing content
-        pass
+        return True
 
-    def _delete_fan_out_from_producer(self):
-        # for retracting content
-        pass
+    def _add_from_producer_to_consumer(self, consumer_id, producer_id):
+        """
+        for subscribe event
+        :param consumer_id: consumer's id
+        :param producer_id: producer's id
+        :return: True on success
+        """
+        content = (self._dataset
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .where(
+                            (self._dataset.actor_id == producer_id) &
+                            (self._dataset.target_id == consumer_id))
+                       .namedtuple())
 
-    def _recreate_user_timeline(self):
-        # to recreate a timeline
-        pass
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content, 400):
+            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+
+        return True
+
+    def _publish_fan_out_from_producer(self, consumer_id, item_id):
+        """
+        for publishing content
+        :param consumer_id: consumer's id
+        :param item_id: item's id
+        :return: True on success
+        """
+
+        content = self._dataset.get(self._dataset.item_id == item_id)
+        redis.zadd(self.create_cache_name(consumer_id), {content.item_id: content.timestamp})
+        return True
+
+    def _delete_fan_out_from_producer(self, consumer_id, item_id):
+        """
+        for retracting content
+        :param consumer_id: consumer's id
+        :param item_id: item's id
+        :return: True on success
+        """
+        redis.zrem(self.create_cache_name(consumer_id), item_id)
+        return True
+
+    def _recreate_user_timeline(self, consumer_id):
+        """
+        recreate users timeline
+        :param consumer_id: consumer's id
+        :return: True on success
+        """
+
+        # get all content with consumer_id as target
+        content = (self._dataset
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .where(self._dataset.target_id == consumer_id)
+                       .namedtuple())
+
+        consumer_feed = self.create_cache_name(consumer_id)
+        for chunk in chunked(content, 400):
+            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+
+        return True
 
 
 class EventProcessor:
