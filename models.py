@@ -9,38 +9,40 @@ class BaseModel(Model):
 
 class Relation(Model):
 
-    subscriber = TextField()
-    publisher = TextField()
+    consumer_id = TextField()
+    producer_id = TextField()
 
     class Meta:
         indexes = (
-            (('subscriber', 'publisher'), True),
+            (('consumer_id', 'producer_id'), True),
         )
 
 
 class FlatEvent(Model):
 
-    item_id = TextField(primary_key=True)
-    actor = TextField()
+    id = AutoField(primary_key=True)
+    item_id = TextField()
+    actor_id = TextField()
     verb = TextField()
-    date = DateTimeField()
+    timestamp = TimestampField()
 
     class Meta:
         indexes = (
-            (('actor', 'item_id', 'verb'), True)
+            (('actor_id', 'item_id', 'verb'), True)
         )
 
 
 class ActivityEvent(Model):
 
-    item_id = TextField(primary_key=True)
-    actor = TextField()
-    object = TextField()
+    id = AutoField(primary_key=True)
+    item_id = TextField()
+    target_id = TextField()
+    actor_id = TextField()
     verb = TextField()
-    date = DateTimeField()
+    timestamp = TimestampField()
 
     class Meta:
         indexes = (
-            (('actor', 'item_id', 'verb', 'object'), True)
+            (('actor_id', 'item_id', 'verb', 'target_id'), True)
         )
 

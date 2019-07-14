@@ -62,6 +62,7 @@ class Flat(BaseEvent):
         ).save()
 
         # TODO 2. queue fan out process
+        return True
 
     def retract_event(self, payload):
         """
@@ -85,10 +86,24 @@ class Flat(BaseEvent):
             consumer_id=consumer_id
         ).save()
         # 2. todo broadcast update timeline
+        return True
 
     @abstractmethod
     def unsubscribe(self, consumer_id, producer_id):
-        pass
+        """
+        unsubscribe a consumer from a producer
+        :param consumer_id: consumer's id
+        :param producer_id: producer's id
+        :return: True on success
+        """
+        (self._relations
+         .delete()
+         .where(
+            (self._relations.consumer_id == consumer_id) &
+            (self._relations.producer_id == producer_id))
+         .execute())
+        # 2. todo broadcast update timeline
+        return True
 
 
 class Activity(BaseEvent):
@@ -108,6 +123,7 @@ class Activity(BaseEvent):
             timestamp=payload.get('timestamp')
         ).save()
         # todo 2. queue fan out process
+        return True
 
     def retract_event(self, payload):
         """
@@ -125,13 +141,14 @@ class Activity(BaseEvent):
              (self._dataset.target_id == payload.get('target_id')))
          .execute())
         # todo queue fan out removal process
+        return True
 
     @abstractmethod
     def subscribe(self, consumer_id, producer_id):
         """
         subscribe a consumer to a producer
-        :param consumer_id:
-        :param producer_id:
+        :param consumer_id: consumer's id
+        :param producer_id: producer's id
         :return: True on success
         """
         # 1. create a new instance of follow
@@ -140,10 +157,24 @@ class Activity(BaseEvent):
             consumer_id=consumer_id
         ).save()
         # 2. todo broadcast update timeline
+        return True
 
     @abstractmethod
     def unsubscribe(self, consumer_id, producer_id):
-        pass
+        """
+        unsubscribe a consumer from a producer
+        :param consumer_id: consumer's id
+        :param producer_id: producer's id
+        :return: True on success
+        """
+        (self._relations
+         .delete()
+         .where(
+            (self._relations.consumer_id == consumer_id) &
+            (self._relations.producer_id == producer_id))
+         .execute())
+        # 2. todo broadcast update timeline
+        return True
 
 
 class EventProcessor:
