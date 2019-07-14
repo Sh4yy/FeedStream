@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from peewee import chunked
 from redis import Redis
 
-
 redis = Redis()
 
 
@@ -74,7 +73,11 @@ class Flat(BaseEvent):
             verb=payload.get('verb')
         ).save()
 
-        # TODO 2. queue fan out process
+        # 2. fan out process
+        self._publish_fan_out_from_producer(
+            producer_id=payload.get('actor_id'),
+            item_id=payload.get('item_id'))
+
         return True
 
     def retract_event(self, payload):
@@ -83,14 +86,20 @@ class Flat(BaseEvent):
         :param payload: json payload { actor_id, item_id }
         :return: True on success
         """
-        # 1. delete instance from database
+
+        # 1. delete fan out
+        self._delete_fan_out_from_producer(
+            producer_id=payload.get('actor_id'),
+            item_id=payload.get('item_id'))
+
+        # 2. delete instance from database
         (self._dataset
          .delete()
          .where(
             (self._dataset.actor_id == payload.get('actor_id')) &
             (self._dataset.item_id == payload.get('item_id')))
          .execute())
-        # todo 2. queue fan out
+
         return True
 
     def subscribe(self, consumer_id, producer_id):
@@ -105,7 +114,12 @@ class Flat(BaseEvent):
             producer_id=producer_id,
             consumer_id=consumer_id
         ).save()
-        # 2. todo broadcast update timeline
+
+        # 2. broadcast update timeline
+        self._add_from_producer_to_consumer(
+            producer_id=producer_id,
+            consumer_id=consumer_id)
+
         return True
 
     def unsubscribe(self, consumer_id, producer_id):
@@ -115,13 +129,19 @@ class Flat(BaseEvent):
         :param producer_id: producer's id
         :return: True on success
         """
+
+        # 1. delete from producer for consumer
+        self._delete_from_producer_for_consumer(
+            producer_id=producer_id,
+            consumer_id=consumer_id)
+
         (self._relations
          .delete()
          .where(
             (self._relations.consumer_id == consumer_id) &
             (self._relations.producer_id == producer_id))
          .execute())
-        # 2. todo broadcast update timeline
+
         return True
 
     def _delete_from_producer_for_consumer(self, producer_id, consumer_id):
@@ -133,8 +153,8 @@ class Flat(BaseEvent):
         """
         # get producer's recent content (need to figure out how many)
         content_id = (self._dataset
-                          .select(self._dataset.item_id)
-                          .where((self._dataset.actor_id == producer_id)))
+                      .select(self._dataset.item_id)
+                      .where((self._dataset.actor_id == producer_id)))
 
         # inject to consumer's feed list
         consumer_feed = self.create_cache_name(consumer_id)
@@ -167,8 +187,8 @@ class Flat(BaseEvent):
         """
         # get producer's followers
         followers = (self._relations
-                         .select(self._relations.subscriber_id)
-                         .where(self._relations.producer_id == producer_id))
+                     .select(self._relations.subscriber_id)
+                     .where(self._relations.producer_id == producer_id))
 
         content = self._dataset.get(self._dataset.item_id == item_id)
         content_info = {content.item_id, content.timestamp}
@@ -208,10 +228,10 @@ class Flat(BaseEvent):
         """
         # get following producers content
         content = (self._dataset
-                       .select(self._dataset.item_id, self._dataset.timestamp)
-                       .join(self._relations, on=self._relations.producer_id == self._dataset.actor_id)
-                       .where(self._relations.consumer_id == consumer_id)
-                       .namedtuple())
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .join(self._relations, on=self._relations.producer_id == self._dataset.actor_id)
+                   .where(self._relations.consumer_id == consumer_id)
+                   .namedtuple())
 
         # inject into user's list
         consumer_feed = self.create_cache_name(consumer_id)
@@ -222,9 +242,9 @@ class Flat(BaseEvent):
             return True
 
         content = (self._dataset
-                       .select(self._dataset.item_id, self._dataset.timestamp)
-                       .where(self._dataset.actor_id == consumer_id)
-                       .namedtuple())
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .where(self._dataset.actor_id == consumer_id)
+                   .namedtuple())
 
         for chunk in chunked(content, 400):
             redis.zadd(consumer_id, dict((c.item_id, c.timestamp) for c in chunk))
@@ -248,7 +268,11 @@ class Activity(BaseEvent):
             target_id=payload.get('target_id'),
             timestamp=payload.get('timestamp')
         ).save()
-        # todo 2. queue fan out process
+
+        # 2. process fan out
+        self._publish_fan_out_from_producer(
+            consumer_id=payload.get('target_id'),
+            item_id=payload.get('item_id'))
         return True
 
     def retract_event(self, payload):
@@ -257,16 +281,21 @@ class Activity(BaseEvent):
         :param payload: json payload { actor_id, item_id, verb, target_id }
         :return: True on success
         """
-        # 1. delete the corresponding instance in database
+
+        # 1. delete fan out
+        self._delete_fan_out_from_producer(
+            consumer_id=payload.get('actor_id'),
+            item_id=payload.get('item_id'))
+
+        # 2. delete the corresponding instance in database
         (self._dataset
          .delete()
          .where(
-             (self._dataset.actor_id == payload.get('actor_id')) &
-             (self._dataset.item_id == payload.get('item_id')) &
-             (self._dataset.verb == payload.get('verb')) &
-             (self._dataset.target_id == payload.get('target_id')))
+            (self._dataset.actor_id == payload.get('actor_id')) &
+            (self._dataset.item_id == payload.get('item_id')) &
+            (self._dataset.verb == payload.get('verb')) &
+            (self._dataset.target_id == payload.get('target_id')))
          .execute())
-        # todo queue fan out removal process
         return True
 
     def subscribe(self, consumer_id, producer_id):
@@ -276,12 +305,17 @@ class Activity(BaseEvent):
         :param producer_id: producer's id
         :return: True on success
         """
+
         # 1. create a new instance of follow
         self._relations.create(
             producer_id=producer_id,
             consumer_id=consumer_id
         ).save()
-        # 2. todo broadcast update timeline
+
+        # 2. broadcast update timeline
+        self._add_from_producer_to_consumer(
+            consumer_id=consumer_id,
+            producer_id=producer_id)
         return True
 
     def unsubscribe(self, consumer_id, producer_id):
@@ -291,13 +325,18 @@ class Activity(BaseEvent):
         :param producer_id: producer's id
         :return: True on success
         """
+        # 1. delete timeline
+        self._delete_from_producer_for_consumer(
+            consumer_id=consumer_id,
+            producer_id=producer_id)
+
         (self._relations
          .delete()
          .where(
             (self._relations.consumer_id == consumer_id) &
             (self._relations.producer_id == producer_id))
          .execute())
-        # 2. todo broadcast update timeline
+
         return True
 
     def _delete_from_producer_for_consumer(self, consumer_id, producer_id):
@@ -309,10 +348,10 @@ class Activity(BaseEvent):
         """
         # get items from producer for consumer
         content_ids = (self._dataset
-                           .select(self._dataset.item_id)
-                           .where(
-                                (self._dataset.actor_id == producer_id) &
-                                (self._dataset.target_id == consumer_id)))
+            .select(self._dataset.item_id)
+            .where(
+            (self._dataset.actor_id == producer_id) &
+            (self._dataset.target_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content_ids, 400):
@@ -329,11 +368,11 @@ class Activity(BaseEvent):
         :return: True on success
         """
         content = (self._dataset
-                       .select(self._dataset.item_id, self._dataset.timestamp)
-                       .where(
-                            (self._dataset.actor_id == producer_id) &
-                            (self._dataset.target_id == consumer_id))
-                       .namedtuple())
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .where(
+            (self._dataset.actor_id == producer_id) &
+            (self._dataset.target_id == consumer_id))
+                   .namedtuple())
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
@@ -372,9 +411,9 @@ class Activity(BaseEvent):
 
         # get all content with consumer_id as target
         content = (self._dataset
-                       .select(self._dataset.item_id, self._dataset.timestamp)
-                       .where(self._dataset.target_id == consumer_id)
-                       .namedtuple())
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .where(self._dataset.target_id == consumer_id)
+                   .namedtuple())
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
@@ -384,7 +423,6 @@ class Activity(BaseEvent):
 
 
 class EventProcessor:
-
     events = []
     event_by_verb = {}
     event_by_name = {}
