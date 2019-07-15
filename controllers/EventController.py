@@ -60,12 +60,12 @@ class Flat(BaseEvent):
     def add_event(self, payload):
         """
         add a new event
-        :param payload: json payload { actor_id, item_id, timestamp, verb }
+        :param payload: json payload { producer_id, item_id, timestamp, verb }
         :return: True on success
         """
         # 1. create a new instance and add to database
         self._dataset.create(
-            actor_id=payload.get('actor_id'),
+            producer_id=payload.get('producer_id'),
             item_id=payload.get('item_id'),
             timestamp=payload.get('timestamp'),
             verb=payload.get('verb')
@@ -73,7 +73,7 @@ class Flat(BaseEvent):
 
         # 2. fan out process
         self._publish_fan_out_from_producer(
-            producer_id=payload.get('actor_id'),
+            producer_id=payload.get('producer_id'),
             item_id=payload.get('item_id'))
 
         return True
@@ -81,20 +81,20 @@ class Flat(BaseEvent):
     def retract_event(self, payload):
         """
         remove a new event
-        :param payload: json payload { actor_id, item_id }
+        :param payload: json payload { producer_id, item_id }
         :return: True on success
         """
 
         # 1. delete fan out
         self._delete_fan_out_from_producer(
-            producer_id=payload.get('actor_id'),
+            producer_id=payload.get('producer_id'),
             item_id=payload.get('item_id'))
 
         # 2. delete instance from database
         (self._dataset
          .delete()
          .where(
-            (self._dataset.actor_id == payload.get('actor_id')) &
+            (self._dataset.producer_id == payload.get('producer_id')) &
             (self._dataset.item_id == payload.get('item_id')))
          .execute())
 
@@ -152,7 +152,7 @@ class Flat(BaseEvent):
         # get producer's recent content (need to figure out how many)
         content_id = (self._dataset
                       .select(self._dataset.item_id)
-                      .where((self._dataset.actor_id == producer_id)))
+                      .where((self._dataset.producer_id == producer_id)))
 
         # inject to consumer's feed list
         consumer_feed = self.create_cache_name(consumer_id)
@@ -169,7 +169,7 @@ class Flat(BaseEvent):
         # get producer's content
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where((self._dataset.actor_id == producer_id))
+                   .where((self._dataset.producer_id == producer_id))
                    .namedtuple())
 
         consumer_feed = self.create_cache_name(consumer_id)
@@ -227,7 +227,7 @@ class Flat(BaseEvent):
         # get following producers content
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .join(self._relations, on=self._relations.producer_id == self._dataset.actor_id)
+                   .join(self._relations, on=self._relations.producer_id == self._dataset.producer_id)
                    .where(self._relations.consumer_id == consumer_id)
                    .namedtuple())
 
@@ -241,7 +241,7 @@ class Flat(BaseEvent):
 
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(self._dataset.actor_id == consumer_id)
+                   .where(self._dataset.producer_id == consumer_id)
                    .namedtuple())
 
         for chunk in chunked(content, 400):
@@ -255,44 +255,44 @@ class Activity(BaseEvent):
     def add_event(self, payload):
         """
         add a new event
-        :param payload: json payload { actor_id, item_id, verb, target_id, timestamp }
+        :param payload: json payload
         :return: True on success
         """
         # 1. create a new instance and add to database
         self._dataset.create(
-            actor_id=payload.get('actor_id'),
-            item_id=payload.get('item_id'),
+            producer_id=payload.get('producer_id'),
+            consumer_id=payload.get('consumer_id'),
             verb=payload.get('verb'),
-            target_id=payload.get('target_id'),
-            timestamp=payload.get('timestamp')
+            timestamp=payload.get('timestamp'),
+            item_id=payload.get('item_id')
         ).save()
 
         # 2. process fan out
         self._publish_fan_out_from_producer(
-            consumer_id=payload.get('target_id'),
+            consumer_id=payload.get('consumer_id'),
             item_id=payload.get('item_id'))
         return True
 
     def retract_event(self, payload):
         """
         retract a new event
-        :param payload: json payload { actor_id, item_id, verb, target_id }
+        :param payload: json payload
         :return: True on success
         """
 
         # 1. delete fan out
         self._delete_fan_out_from_producer(
-            consumer_id=payload.get('actor_id'),
+            consumer_id=payload.get('producer_id'),
             item_id=payload.get('item_id'))
 
         # 2. delete the corresponding instance in database
         (self._dataset
          .delete()
          .where(
-            (self._dataset.actor_id == payload.get('actor_id')) &
+            (self._dataset.producer_id == payload.get('producer_id')) &
             (self._dataset.item_id == payload.get('item_id')) &
             (self._dataset.verb == payload.get('verb')) &
-            (self._dataset.target_id == payload.get('target_id')))
+            (self._dataset.consumer_id == payload.get('consumer_id')))
          .execute())
         return True
 
@@ -346,10 +346,10 @@ class Activity(BaseEvent):
         """
         # get items from producer for consumer
         content_ids = (self._dataset
-            .select(self._dataset.item_id)
-            .where(
-            (self._dataset.actor_id == producer_id) &
-            (self._dataset.target_id == consumer_id)))
+                           .select(self._dataset.item_id)
+                           .where(
+                                (self._dataset.producer_id == producer_id) &
+                                (self._dataset.consumer_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content_ids, 400):
@@ -368,8 +368,8 @@ class Activity(BaseEvent):
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
                    .where(
-            (self._dataset.actor_id == producer_id) &
-            (self._dataset.target_id == consumer_id))
+                        (self._dataset.producer_id == producer_id) &
+                        (self._dataset.consumer_id == consumer_id))
                    .namedtuple())
 
         consumer_feed = self.create_cache_name(consumer_id)
@@ -410,7 +410,7 @@ class Activity(BaseEvent):
         # get all content with consumer_id as target
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(self._dataset.target_id == consumer_id)
+                   .where(self._dataset.consumer_id == consumer_id)
                    .namedtuple())
 
         consumer_feed = self.create_cache_name(consumer_id)
@@ -418,5 +418,4 @@ class Activity(BaseEvent):
             redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
         return True
-
 

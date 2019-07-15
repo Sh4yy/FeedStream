@@ -23,13 +23,13 @@ class FlatEvent(Model):
 
     id = AutoField(primary_key=True)
     item_id = TextField()
-    actor_id = TextField()
+    producer_id = TextField()
     verb = TextField()
     timestamp = TimestampField()
 
     class Meta:
         indexes = (
-            (('actor_id', 'item_id', 'verb'), True)
+            (('producer_id', 'item_id', 'verb'), True)
         )
 
 
@@ -37,13 +37,13 @@ class ActivityEvent(Model):
 
     id = AutoField(primary_key=True)
     item_id = TextField()
-    target_id = TextField()
-    actor_id = TextField()
+    consumer_id = TextField()
+    producer_id = TextField()
     verb = TextField()
     timestamp = TimestampField()
 
     class Meta:
         indexes = (
-            (('actor_id', 'item_id', 'verb', 'target_id'), True)
+            (('producer_id', 'item_id', 'verb', 'consumer_id'), True)
         )
 

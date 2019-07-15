@@ -1,6 +1,7 @@
 from controllers import Activity, Flat, EventProcessor, TaskQueue
 from models import ActivityEvent, FlatEvent, Relation, BaseModel
 from sanic import Sanic
+from routes import mod
 from utils import db
 
 
@@ -46,6 +47,12 @@ def setup_database():
 
 
 def setup_web_server():
-    pass
+    """ setup the web server """
 
+    setup_system()
+    setup_workers()
+    setup_database()
 
+    app = Sanic(__name__)
+    app.blueprint(mod)
+    return app
