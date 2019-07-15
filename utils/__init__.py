@@ -1,11 +1,11 @@
 from .OrangeDB import Orange
 from peewee import PostgresqlDatabase
-from redis import Redis
+from redis import StrictRedis
 
 
 config = Orange('config.json', auto_dump=True, load=True)
 
-redis = Redis(
+redis = StrictRedis(
     host=config['redis']['host'],
     port=config['redis']['port'])
 

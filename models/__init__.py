@@ -5,10 +5,10 @@ from utils import db
 class BaseModel(Model):
 
     class Meta:
-        db = db
+        database = db
 
 
-class Relation(Model):
+class Relation(BaseModel):
 
     consumer_id = TextField()
     producer_id = TextField()
@@ -19,31 +19,31 @@ class Relation(Model):
         )
 
 
-class FlatEvent(Model):
+class FlatEvent(BaseModel):
 
     id = AutoField(primary_key=True)
     item_id = TextField()
     producer_id = TextField()
     verb = TextField()
-    timestamp = TimestampField()
+    timestamp = IntegerField()
 
     class Meta:
         indexes = (
-            (('producer_id', 'item_id', 'verb'), True)
+            (('producer_id', 'item_id', 'verb'), True),
         )
 
 
-class ActivityEvent(Model):
+class ActivityEvent(BaseModel):
 
     id = AutoField(primary_key=True)
     item_id = TextField()
     consumer_id = TextField()
     producer_id = TextField()
     verb = TextField()
-    timestamp = TimestampField()
+    timestamp = IntegerField()
 
     class Meta:
         indexes = (
-            (('producer_id', 'item_id', 'verb', 'consumer_id'), True)
+            (('producer_id', 'item_id', 'verb', 'consumer_id'), True),
         )
 

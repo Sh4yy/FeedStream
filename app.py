@@ -5,18 +5,21 @@ from routes import mod
 from utils import db
 
 
+# classes that are required
+class UserRelations(Relation):
+    """ normal user relations """
+
+
+class FeedPosts(FlatEvent):
+    """ feed posts dataset """
+
+
+class NotificationPosts(ActivityEvent):
+    """ notification items data set """
+
+
 def setup_system():
     """ Setup the aggregation system here """
-
-    # classes that are required
-    class UserRelations(Relation):
-        """ normal user relations """
-
-    class FeedPosts(FlatEvent):
-        """ feed posts dataset """
-
-    class NotificationPosts(ActivityEvent):
-        """ notification items data set """
 
     # register feeds
     (EventProcessor.register_event_handler(
@@ -40,10 +43,19 @@ def setup_workers():
     task_queue.start_workers()
 
 
-def setup_database():
+def setup_database(drop=False):
     """ setup cache and database """
 
-    db.create_tables(BaseModel.__subclasses__())
+    db.connect()
+
+    if drop:
+        db.drop_tables(Relation.__subclasses__())
+        db.drop_tables(FlatEvent.__subclasses__())
+        db.drop_tables(ActivityEvent.__subclasses__())
+
+    db.create_tables(Relation.__subclasses__())
+    db.create_tables(FlatEvent.__subclasses__())
+    db.create_tables(ActivityEvent.__subclasses__())
 
 
 def setup_web_server():

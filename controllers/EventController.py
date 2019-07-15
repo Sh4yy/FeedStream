@@ -52,7 +52,7 @@ class BaseEvent(ABC):
 
     @property
     def name(self):
-        return self.name
+        return self._name
 
 
 class Flat(BaseEvent):
@@ -65,16 +65,16 @@ class Flat(BaseEvent):
         """
         # 1. create a new instance and add to database
         self._dataset.create(
-            producer_id=payload.get('producer_id'),
-            item_id=payload.get('item_id'),
-            timestamp=payload.get('timestamp'),
-            verb=payload.get('verb')
+            producer_id=payload['producer_id'],
+            item_id=payload['item_id'],
+            timestamp=payload['timestamp'],
+            verb=payload['verb']
         ).save()
 
         # 2. fan out process
         self._publish_fan_out_from_producer(
-            producer_id=payload.get('producer_id'),
-            item_id=payload.get('item_id'))
+            producer_id=payload['producer_id'],
+            item_id=payload['item_id'])
 
         return True
 
@@ -150,14 +150,15 @@ class Flat(BaseEvent):
         :return: True on success
         """
         # get producer's recent content (need to figure out how many)
-        content_id = (self._dataset
-                      .select(self._dataset.item_id)
-                      .where((self._dataset.producer_id == producer_id)))
+        content_ids = (self._dataset
+                       .select(self._dataset.item_id)
+                       .where((self._dataset.producer_id == producer_id))
+                       .namedtuples())
 
         # inject to consumer's feed list
         consumer_feed = self.create_cache_name(consumer_id)
-        for chunk in chunked(content_id, 400):
-            redis.zrem(consumer_feed, chunk)
+        for content_id in content_ids:
+            redis.zrem(consumer_feed, content_id.item_id)
 
         return True
 
@@ -169,8 +170,7 @@ class Flat(BaseEvent):
         # get producer's content
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where((self._dataset.producer_id == producer_id))
-                   .namedtuple())
+                   .where((self._dataset.producer_id == producer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
@@ -185,15 +185,16 @@ class Flat(BaseEvent):
         """
         # get producer's followers
         followers = (self._relations
-                     .select(self._relations.subscriber_id)
-                     .where(self._relations.producer_id == producer_id))
+                     .select(self._relations.consumer_id)
+                     .where(self._relations.producer_id == producer_id)
+                     .namedtuples())
 
         content = self._dataset.get(self._dataset.item_id == item_id)
-        content_info = {content.item_id, content.timestamp}
+        content_info = {content.item_id: content.timestamp}
 
         # inject content id to their list
         for follower in followers:
-            redis.zadd(self.create_cache_name(follower), content_info)
+            redis.zadd(self.create_cache_name(follower.consumer_id), content_info)
 
         if self._include_actor:
             redis.zadd(self.create_cache_name(producer_id), content_info)
@@ -207,15 +208,16 @@ class Flat(BaseEvent):
         """
         # get producer's followers
         followers = (self._relations
-                     .select(self._relations.subscriber_id)
-                     .where(self._relations.producer_id == producer_id))
+                     .select(self._relations.consumer_id)
+                     .where(self._relations.producer_id == producer_id)
+                     .namedtuples())
 
         # inject content id to their list
         for follower in followers:
-            redis.zrem(self.create_cache_name(follower), [item_id])
+            redis.zrem(self.create_cache_name(follower.consumer_id), item_id)
 
         if self._include_actor:
-            redis.zrem(self.create_cache_name(producer_id), [item_id])
+            redis.zrem(self.create_cache_name(producer_id), item_id)
 
         return True
 
@@ -228,8 +230,7 @@ class Flat(BaseEvent):
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
                    .join(self._relations, on=self._relations.producer_id == self._dataset.producer_id)
-                   .where(self._relations.consumer_id == consumer_id)
-                   .namedtuple())
+                   .where(self._relations.consumer_id == consumer_id))
 
         # inject into user's list
         consumer_feed = self.create_cache_name(consumer_id)
@@ -241,8 +242,7 @@ class Flat(BaseEvent):
 
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(self._dataset.producer_id == consumer_id)
-                   .namedtuple())
+                   .where(self._dataset.producer_id == consumer_id))
 
         for chunk in chunked(content, 400):
             redis.zadd(consumer_id, dict((c.item_id, c.timestamp) for c in chunk))
@@ -352,9 +352,8 @@ class Activity(BaseEvent):
                                 (self._dataset.consumer_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
-        for chunk in chunked(content_ids, 400):
-            # remove from consumer cache
-            redis.zrem(consumer_feed, chunk)
+        for content_id in content_ids:
+            redis.zrem(consumer_feed, content_id)
 
         return True
 
@@ -369,8 +368,7 @@ class Activity(BaseEvent):
                    .select(self._dataset.item_id, self._dataset.timestamp)
                    .where(
                         (self._dataset.producer_id == producer_id) &
-                        (self._dataset.consumer_id == consumer_id))
-                   .namedtuple())
+                        (self._dataset.consumer_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
@@ -410,8 +408,7 @@ class Activity(BaseEvent):
         # get all content with consumer_id as target
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(self._dataset.consumer_id == consumer_id)
-                   .namedtuple())
+                   .where(self._dataset.consumer_id == consumer_id))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
