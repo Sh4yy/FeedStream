@@ -46,6 +46,53 @@ class BaseEvent(ABC):
         """
         return f"{id}:{self.name}"
 
+    @staticmethod
+    def _calculate_start_end(name, limit, after, before):
+        """
+        calculate start and end index of list
+        :param name: list name
+        :param limit: number of elements
+        :param after: after id
+        :param before: before id
+        :return: start, end index
+        """
+        start, end = 0, 0
+        if not after and not before:
+            end = limit - 1
+        elif after is not None:
+            start = redis.zrevrank(name, after) + 1
+            end = start + limit - 1
+        elif before is not None:
+            end = redis.zrevrank(name, before) - 1
+            start = end - limit + 1 if end > limit else 0
+        else:
+            raise Exception('cant have both after and before')
+        return start, end
+
+    def consume(self, consumer_id, limit=20, after=None, before=None):
+        """
+        get data for consumer
+        :param consumer_id: consumer's id
+        :param limit: number of data to be returned
+        :param after: return after (id)
+        :param before: return before (id)
+        :return: list of { 'id': item_id, 'verb': verb }
+        """
+
+        consumer_feed = self.create_cache_name(consumer_id)
+        start, end = self._calculate_start_end(consumer_feed, limit, after, before)
+        bin_resp = redis.zrevrange(consumer_feed, start, end)
+        response = list(map(lambda x: x.decode(), bin_resp))
+
+        if not response:
+            return []
+
+        return (self._dataset
+                    .select(self._dataset.item_id, self._dataset.verb)
+                    .where(self._dataset.item_id << response)
+                    .order_by(self._dataset.timestamp.desc())
+                    .dicts())
+
     @property
     def verbs(self):
         return self._verbs

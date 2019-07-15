@@ -36,6 +36,27 @@ class EventProcessor:
         return True
 
     @classmethod
+    def consume(cls, event_name, consumer_id, limit=20, after=None, before=None):
+        """
+        consume for consumer
+        :param event_name: event name
+        :param consumer_id: consumer's id
+        :param limit: number of returned data
+        :param after: after specific item
+        :param before: before specific item
+        :return: [{ item_id, verb }]
+        """
+
+        if event_name not in cls.event_by_name:
+            raise Exception('event does not exist')
+
+        return (cls.event_by_name[event_name]
+                   .consume(consumer_id=consumer_id,
+                            limit=limit,
+                            after=after,
+                            before=before))
+
+    @classmethod
     def add_event(cls, payload):
         """
         register new event

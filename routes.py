@@ -16,7 +16,7 @@ retract_schema = Schema({
 })
 
 consume_schema = Schema({
-    'consumer_id': str, Optional('before'): str, Optional('after'): str, Optional('limit'): int
+    'event_name': str, 'consumer_id': str, Optional('before'): str, Optional('after'): str, Optional('limit'): int
 })
 
 subscribe_schema = Schema({
@@ -89,4 +89,17 @@ def consume(request):
     if not consume_schema.is_valid(request.json):
         abort(400, message='invalid request body')
 
-    # todo implement consume
+    after = request.json.get('after')
+    before = request.json.get('before')
+    limit = request.json.get('limit')
+    event_name = request.json.get('event_name')
+    consumer_id = request.json.get('consumer_id')
+
+    if after and before:
+        abort(400, message='cant use after and before at once')
+
+    resp = EventProcessor.consume(event_name=event_name, limit=limit,
+                                  after=after, before=before,
+                                  consumer_id=consumer_id)
+
+    return request.json({'ok': True, 'data': resp})
