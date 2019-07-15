@@ -22,7 +22,7 @@ class Relation(BaseModel):
 class FlatEvent(BaseModel):
 
     id = AutoField(primary_key=True)
-    item_id = TextField()
+    item_id = TextField(index=True)
     producer_id = TextField()
     verb = TextField()
     timestamp = IntegerField()
@@ -36,7 +36,7 @@ class FlatEvent(BaseModel):
 class ActivityEvent(BaseModel):
 
     id = AutoField(primary_key=True)
-    item_id = TextField()
+    item_id = TextField(index=True)
     consumer_id = TextField()
     producer_id = TextField()
     verb = TextField()

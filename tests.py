@@ -26,6 +26,9 @@ def clear_ns(ns):
 def init():
     setup_system()
     setup_workers()
+
+
+def drop():
     setup_database(drop=True)
     clear_ns('')
 
@@ -79,11 +82,11 @@ def consume():
 
 if __name__ == '__main__':
     init()
-    subscribe()
-    publish()
-    retract()
-    unsub_sub()
-
-    sleep(2)
+    #     # subscribe()
+    #     # publish()
+    #     # retract()
+    #     # unsub_sub()
+    #     #
+    #     # sleep(10)
     consume()
     print('done')

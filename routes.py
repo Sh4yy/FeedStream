@@ -16,7 +16,7 @@ retract_schema = Schema({
 })
 
 consume_schema = Schema({
-    'event_name': str, 'consumer_id': str, Optional('before'): str, Optional('after'): str, Optional('limit'): int
+    'event_name': str, 'consumer_id': str, Optional('before'): str, Optional('after'): str, Optional('limit'): str
 })
 
 subscribe_schema = Schema({
@@ -86,14 +86,15 @@ def unsubscribe(request):
 def consume(request):
     """ consume a feed by user """
 
-    if not consume_schema.is_valid(request.json):
+    print(request.raw_args)
+    if not consume_schema.is_valid(request.raw_args):
         abort(400, message='invalid request body')
 
-    after = request.json.get('after')
-    before = request.json.get('before')
-    limit = request.json.get('limit')
-    event_name = request.json.get('event_name')
-    consumer_id = request.json.get('consumer_id')
+    after = request.raw_args.get('after', None)
+    before = request.raw_args.get('before', None)
+    limit = int(request.raw_args.get('limit', 20))
+    event_name = request.raw_args.get('event_name')
+    consumer_id = request.raw_args.get('consumer_id')
 
     if after and before:
         abort(400, message='cant use after and before at once')
@@ -102,4 +103,4 @@ def consume(request):
                                   after=after, before=before,
                                   consumer_id=consumer_id)
 
-    return request.json({'ok': True, 'data': resp})
+    return response.json({'ok': True, 'data': list(resp)})
