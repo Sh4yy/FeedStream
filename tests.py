@@ -6,7 +6,7 @@ from random import choice, sample, randint
 from utils import redis
 
 published_ids = []
-users = ['joe', 'candice', 'jack', 'alice']
+users = ['joe', 'candice', 'jack', 'alice', 'jenna', 'zack', 'leo', 'pit', 'ed', 'alex', 'sarah']
 
 
 def clear_ns(ns):
@@ -25,7 +25,7 @@ def clear_ns(ns):
 
 def init():
     setup_system()
-    setup_workers()
+    setup_workers(workers=5)
 
 
 def drop():
@@ -35,13 +35,13 @@ def drop():
 
 def subscribe():
 
-    for user in users:
+    for user in sample(users, k=5):
         EventProcessor.subscribe("feed", "shayan", user)
 
 
 def publish():
 
-    for i in range(500):
+    for i in range(5000000):
         producer_id = choice(users)
         item_id = i
         published_ids.append((item_id, producer_id))
@@ -82,11 +82,12 @@ def consume():
 
 if __name__ == '__main__':
     init()
-    #     # subscribe()
-    #     # publish()
-    #     # retract()
-    #     # unsub_sub()
+    drop()
+    subscribe()
+    publish()
+    retract()
+    unsub_sub()
     #     #
-    #     # sleep(10)
+    sleep(10)
     consume()
     print('done')

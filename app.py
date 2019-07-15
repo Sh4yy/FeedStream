@@ -35,10 +35,10 @@ def setup_system():
     ))
 
 
-def setup_workers():
+def setup_workers(workers=1):
     """ Setup task queue and workers """
 
-    task_queue = TaskQueue(workers=1)
+    task_queue = TaskQueue(workers=workers)
     EventProcessor.register_task_queue(task_queue)
     task_queue.start_workers()
 

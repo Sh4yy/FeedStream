@@ -86,7 +86,6 @@ def unsubscribe(request):
 def consume(request):
     """ consume a feed by user """
 
-    print(request.raw_args)
     if not consume_schema.is_valid(request.raw_args):
         abort(400, message='invalid request body')
 
