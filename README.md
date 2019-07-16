@@ -1,4 +1,4 @@
-# FeedStram
+# FeedStream
 
 This is my implementation of a chronological based timeline/feed stream. This service allows you to design and customize multiple different stream feeds based on your app or website's requirements.
 
