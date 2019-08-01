@@ -1,18 +1,23 @@
 import requests
+from random import choice
 
 
 class BaseEventStream:
 
-    def __init__(self, host, port, version: str = 'v1'):
+    def __init__(self, host, ports, version: str = 'v1'):
         """
         initialize a new FeedStreamClient
         :param host: client's host
-        :param port: client's port
+        :param ports: client's port list
         :param version: version of the api
         """
         self._host = host
-        self._port = port
+        self._ports = ports
         self._version = version
+
+    @property
+    def _port(self):
+        return choice(self._ports)
 
     def _post_request(self, method, payload: dict):
         """
@@ -48,14 +53,14 @@ class BaseEventStream:
         """
 
         payload = {
-            "producer_id": producer_id,
-            "item_id": item_id,
+            "producer_id": str(producer_id),
+            "item_id": str(item_id),
             "timestamp": timestamp,
             "verb": verb,
         }
 
         if consumer_id is not None:
-            payload['consumer_id'] = consumer_id
+            payload['consumer_id'] = str(consumer_id)
 
         response = self._post_request('publish', payload=payload)
         return response['published']
@@ -72,13 +77,13 @@ class BaseEventStream:
         """
 
         payload = {
-            "producer_id": producer_id,
-            "item_id": item_id,
+            "producer_id": str(producer_id),
+            "item_id": str(item_id),
             "verb": verb
         }
 
         if consumer_id is not None:
-            payload['consumer_id'] = consumer_id
+            payload['consumer_id'] = str(consumer_id)
 
         response = self._post_request('retract', payload=payload)
         return response['retracted']
@@ -94,8 +99,8 @@ class BaseEventStream:
 
         payload = {
             "event_name": event_name,
-            "producer_id": producer_id,
-            "consumer_id": consumer_id
+            "producer_id": str(producer_id),
+            "consumer_id": str(consumer_id)
         }
 
         response = self._post_request('subscribe', payload=payload)
@@ -112,12 +117,12 @@ class BaseEventStream:
 
         payload = {
             "event_name": event_name,
-            "producer_id": producer_id,
-            "consumer_id": consumer_id
+            "producer_id": str(producer_id),
+            "consumer_id": str(consumer_id)
         }
 
         response = self._post_request('unsubscribe', payload=payload)
-        return response['unsubscribe']
+        return response['unsubscribed']
 
     def _consume(self, event_name: str, consumer_id: str, limit: int = 20,
                  after: str = None, before: str = None):
@@ -133,7 +138,7 @@ class BaseEventStream:
 
         args = {
             "event_name": event_name,
-            "consumer_id": consumer_id,
+            "consumer_id": str(consumer_id),
             "limit": limit
         }
 
@@ -155,7 +160,7 @@ class FlatEventStream(BaseEventStream):
         :param host: service host
         :param port: service port
         """
-        super(BaseEventStream).__init__(self, host, port)
+        super().__init__(host, port)
         self._event_name = event_name
 
     def publish(self, producer_id: str, item_id: str, verb: str, timestamp: int):
@@ -202,7 +207,7 @@ class FlatEventStream(BaseEventStream):
         return self._unsubscribe(self._event_name, producer_id, consumer_id)
 
     def consume(self, consumer_id: str, limit: int = 20,
-                 after: str = None, before: str = None):
+                after: str = None, before: str = None):
         """
         consume a feed for a user
         :param consumer_id: consumer's id
@@ -224,7 +229,7 @@ class ActivityEventStream(BaseEventStream):
         :param host: service host
         :param port: service port
         """
-        super(BaseEventStream).__init__(self, host, port)
+        super().__init__(host, port)
         self._event_name = event_name
 
     def publish(self, producer_id: str, item_id: str, verb: str, timestamp: int, consumer_id: str):
