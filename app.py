@@ -58,12 +58,12 @@ def setup_database(drop=False):
     db.create_tables(ActivityEvent.__subclasses__())
 
 
-def setup_web_server():
+def setup_web_server(workers=1):
     """ setup the web server """
 
     setup_system()
-    setup_workers()
-    setup_database()
+    setup_workers(workers)
+    setup_database(drop=True)
 
     app = Sanic(__name__)
     app.blueprint(mod)

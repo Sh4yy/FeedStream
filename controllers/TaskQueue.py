@@ -21,9 +21,6 @@ class TaskQueue(Queue):
         :param kwargs: task kwargs
         :return: True on success
         """
-
-        print(self.qsize())
-
         self.put((task, args or (), kwargs or {}))
         return True
 
@@ -45,6 +42,10 @@ class TaskQueue(Queue):
         """
         while True:
             task, args, kwargs = self.get(block=True)
-            task(*args, **kwargs)
-            self.task_done()
-
+            try:
+                task(*args, **kwargs)
+                self.task_done()
+            except Exception as e:
+                print(e)
+                # todo implement logging
+                pass
