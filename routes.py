@@ -54,6 +54,7 @@ def retract(request):
 def subscribe(request):
     """ subscribe to a publisher """
 
+    print(request.json)
     if not subscribe_schema.is_valid(request.json):
         abort(400, message='invalid request body')
 

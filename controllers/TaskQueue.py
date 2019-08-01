@@ -21,6 +21,9 @@ class TaskQueue(Queue):
         :param kwargs: task kwargs
         :return: True on success
         """
+
+        print(self.qsize())
+
         self.put((task, args or (), kwargs or {}))
         return True
 

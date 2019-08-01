@@ -81,6 +81,11 @@ class BaseEvent(ABC):
 
         consumer_feed = self.create_cache_name(consumer_id)
         start, end = self._calculate_start_end(consumer_feed, limit, after, before)
+
+        # if consumer feed does not exist, query for creation
+        if not redis.exists(consumer_feed):
+            self._recreate_user_timeline(consumer_id)
+
         bin_resp = redis.zrevrange(consumer_feed, start, end)
         response = list(map(lambda x: x.decode(), bin_resp))
 
@@ -92,6 +97,10 @@ class BaseEvent(ABC):
                     .where(self._dataset.item_id << response)
                     .order_by(self._dataset.timestamp.desc())
                     .dicts())
+
+    @abstractmethod
+    def _recreate_user_timeline(self, consumer_id):
+        raise NotImplementedError()
 
     @property
     def verbs(self):
@@ -273,13 +282,13 @@ class Flat(BaseEvent):
         for when (server restarts, or a new user logs in)
         :return: True on success
         """
-        # get following producers content
-        content = (self._dataset
-                   .select(self._dataset.item_id, self._dataset.timestamp)
-                   .join(self._relations, on=self._relations.producer_id == self._dataset.producer_id)
-                   .where(self._relations.consumer_id == consumer_id))
 
-        # inject into user's list
+        content = (self._relations
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .join(self._dataset, on=(self._relations.producer_id == self._dataset.producer_id))
+                       .where(self._relations.consumer_id == consumer_id)
+                       .namedtuples())
+
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
             redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
