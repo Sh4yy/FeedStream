@@ -287,6 +287,7 @@ class Flat(BaseEvent):
                        .select(self._dataset.item_id, self._dataset.timestamp)
                        .join(self._dataset, on=(self._relations.producer_id == self._dataset.producer_id))
                        .where(self._relations.consumer_id == consumer_id)
+                       .order_by(self._dataset.timestamp.desc()).limit(self._max_cache)
                        .namedtuples())
 
         consumer_feed = self.create_cache_name(consumer_id)
@@ -464,7 +465,8 @@ class Activity(BaseEvent):
         # get all content with consumer_id as target
         content = (self._dataset
                    .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(self._dataset.consumer_id == consumer_id))
+                   .where(self._dataset.consumer_id == consumer_id)
+                   .order_by(self._dataset.timestamp.desc()).limit(self._max_cache))
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
