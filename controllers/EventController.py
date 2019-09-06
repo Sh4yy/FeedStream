@@ -212,10 +212,12 @@ class Flat(BaseEvent):
                        .namedtuples())
 
         # inject to consumer's feed list
+        pipe = redis.pipeline()
         consumer_feed = self.create_cache_name(consumer_id)
         for content_id in content_ids:
-            redis.zrem(consumer_feed, content_id.item_id)
+            pipe.zrem(consumer_feed, content_id.item_id)
 
+        pipe.execute()
         return True
 
     def _add_from_producer_to_consumer(self, producer_id, consumer_id):
@@ -228,10 +230,12 @@ class Flat(BaseEvent):
                    .select(self._dataset.item_id, self._dataset.timestamp)
                    .where((self._dataset.producer_id == producer_id)))
 
+        pipe = redis.pipeline()
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
-            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+            pipe.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.execute()
         return True
 
     def _publish_fan_out_from_producer(self, producer_id, item_id):
@@ -249,12 +253,14 @@ class Flat(BaseEvent):
         content_info = {content.item_id: content.timestamp}
 
         # inject content id to their list
+        pipe = redis.pipeline()
         for follower in followers:
-            redis.zadd(self.create_cache_name(follower.consumer_id), content_info)
+            pipe.zadd(self.create_cache_name(follower.consumer_id), content_info)
 
         if self._include_actor:
-            redis.zadd(self.create_cache_name(producer_id), content_info)
+            pipe.zadd(self.create_cache_name(producer_id), content_info)
 
+        pipe.execute()
         return True
 
     def _delete_fan_out_from_producer(self, producer_id, item_id):
@@ -269,12 +275,14 @@ class Flat(BaseEvent):
                      .namedtuples())
 
         # inject content id to their list
+        pipe = redis.pipeline()
         for follower in followers:
-            redis.zrem(self.create_cache_name(follower.consumer_id), item_id)
+            pipe.zrem(self.create_cache_name(follower.consumer_id), item_id)
 
         if self._include_actor:
-            redis.zrem(self.create_cache_name(producer_id), item_id)
+            pipe.zrem(self.create_cache_name(producer_id), item_id)
 
+        pipe.execute()
         return True
 
     def _recreate_user_timeline(self, consumer_id):
@@ -301,9 +309,11 @@ class Flat(BaseEvent):
                    .select(self._dataset.item_id, self._dataset.timestamp)
                    .where(self._dataset.producer_id == consumer_id))
 
+        pipe = redis.pipeline()
         for chunk in chunked(content, 400):
-            redis.zadd(consumer_id, dict((c.item_id, c.timestamp) for c in chunk))
+            pipe.zadd(consumer_id, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.execute()
         return True
 
 
@@ -408,10 +418,12 @@ class Activity(BaseEvent):
                                 (self._dataset.producer_id == producer_id) &
                                 (self._dataset.consumer_id == consumer_id)))
 
+        pipe = redis.pipeline()
         consumer_feed = self.create_cache_name(consumer_id)
         for content_id in content_ids:
-            redis.zrem(consumer_feed, content_id)
+            pipe.zrem(consumer_feed, content_id)
 
+        pipe.execute()
         return True
 
     def _add_from_producer_to_consumer(self, consumer_id, producer_id):
@@ -428,9 +440,11 @@ class Activity(BaseEvent):
                         (self._dataset.consumer_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
+        pipe = redis.pipeline()
         for chunk in chunked(content, 400):
-            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+            pipe.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.execute()
         return True
 
     def _publish_fan_out_from_producer(self, consumer_id, item_id):
@@ -468,9 +482,11 @@ class Activity(BaseEvent):
                    .where(self._dataset.consumer_id == consumer_id)
                    .order_by(self._dataset.timestamp.desc()).limit(self._max_cache))
 
+        pipe = redis.pipeline()
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
-            redis.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
+            pipe.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.execute()
         return True
 
