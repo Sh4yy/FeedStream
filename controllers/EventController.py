@@ -46,6 +46,25 @@ class BaseEvent(ABC):
         """
         return f"{id}:{self.name}"
 
+    def clean_excess_from_cache(self, consumer_id):
+        """
+        clean excess data from the cache
+        :param consumer_id: consumer's id
+        :return: lua script for this command
+        """
+        cache_name = self.create_cache_name(consumer_id)
+        lua_script = f"""
+        local count = redis.call('zcount', {cache_name}, 0, 1000)
+	    if count > {self._max_cache} then
+	  	    local diff = count - {self._max_cache}
+	  	    redis.call('zpopmin', 'scores', diff)
+	  	    return diff
+	    else 
+	        return 0
+	    end
+        """
+        return lua_script
+
     @staticmethod
     def _calculate_start_end(name, limit, after, before):
         """
@@ -93,10 +112,10 @@ class BaseEvent(ABC):
             return []
 
         return (self._dataset
-                    .select(self._dataset.item_id, self._dataset.verb)
-                    .where(self._dataset.item_id << response)
-                    .order_by(self._dataset.timestamp.desc())
-                    .dicts())
+                .select(self._dataset.item_id, self._dataset.verb)
+                .where(self._dataset.item_id << response)
+                .order_by(self._dataset.timestamp.desc())
+                .dicts())
 
     @abstractmethod
     def _recreate_user_timeline(self, consumer_id):
@@ -235,6 +254,7 @@ class Flat(BaseEvent):
         for chunk in chunked(content, 400):
             pipe.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.eval(self.clean_excess_from_cache(consumer_id), 0)
         pipe.execute()
         return True
 
@@ -256,9 +276,11 @@ class Flat(BaseEvent):
         pipe = redis.pipeline()
         for follower in followers:
             pipe.zadd(self.create_cache_name(follower.consumer_id), content_info)
+            pipe.eval(self.clean_excess_from_cache(follower.consumer_id), 0)
 
         if self._include_actor:
             pipe.zadd(self.create_cache_name(producer_id), content_info)
+            pipe.eval(self.clean_excess_from_cache(producer_id), 0)
 
         pipe.execute()
         return True
@@ -292,11 +314,11 @@ class Flat(BaseEvent):
         """
 
         content = (self._relations
-                       .select(self._dataset.item_id, self._dataset.timestamp)
-                       .join(self._dataset, on=(self._relations.producer_id == self._dataset.producer_id))
-                       .where(self._relations.consumer_id == consumer_id)
-                       .order_by(self._dataset.timestamp.desc()).limit(self._max_cache)
-                       .namedtuples())
+                   .select(self._dataset.item_id, self._dataset.timestamp)
+                   .join(self._dataset, on=(self._relations.producer_id == self._dataset.producer_id))
+                   .where(self._relations.consumer_id == consumer_id)
+                   .order_by(self._dataset.timestamp.desc()).limit(self._max_cache)
+                   .namedtuples())
 
         consumer_feed = self.create_cache_name(consumer_id)
         for chunk in chunked(content, 400):
@@ -434,16 +456,17 @@ class Activity(BaseEvent):
         :return: True on success
         """
         content = (self._dataset
-                   .select(self._dataset.item_id, self._dataset.timestamp)
-                   .where(
-                        (self._dataset.producer_id == producer_id) &
-                        (self._dataset.consumer_id == consumer_id)))
+                       .select(self._dataset.item_id, self._dataset.timestamp)
+                       .where(
+                            (self._dataset.producer_id == producer_id) &
+                            (self._dataset.consumer_id == consumer_id)))
 
         consumer_feed = self.create_cache_name(consumer_id)
         pipe = redis.pipeline()
         for chunk in chunked(content, 400):
             pipe.zadd(consumer_feed, dict((c.item_id, c.timestamp) for c in chunk))
 
+        pipe.eval(self.clean_excess_from_cache(consumer_id), 0)
         pipe.execute()
         return True
 
@@ -457,6 +480,7 @@ class Activity(BaseEvent):
 
         content = self._dataset.get(self._dataset.item_id == item_id)
         redis.zadd(self.create_cache_name(consumer_id), {content.item_id: content.timestamp})
+        redis.eval(self.clean_excess_from_cache(consumer_id), 0)
         return True
 
     def _delete_fan_out_from_producer(self, consumer_id, item_id):
@@ -489,4 +513,3 @@ class Activity(BaseEvent):
 
         pipe.execute()
         return True
-
