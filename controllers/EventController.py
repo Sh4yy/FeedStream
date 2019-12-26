@@ -54,7 +54,7 @@ class BaseEvent(ABC):
         """
         cache_name = self.create_cache_name(consumer_id)
         lua_script = f"""
-        local count = redis.call('zcount', {cache_name}, 0, 1000)
+        local count = redis.call('zcount', '{cache_name}', 0, 1000)
 	    if count > {self._max_cache} then
 	  	    local diff = count - {self._max_cache}
 	  	    redis.call('zpopmin', 'scores', diff)

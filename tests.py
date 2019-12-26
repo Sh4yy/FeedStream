@@ -1,7 +1,6 @@
 from app import setup_database, setup_workers, setup_system
 from controllers import *
 from time import time, sleep
-from uuid import uuid4
 from random import choice, sample, randint
 from utils import redis
 
