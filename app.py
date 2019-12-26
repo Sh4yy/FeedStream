@@ -24,7 +24,7 @@ def setup_system():
     # register feeds
     (EventProcessor.register_event_handler(
         Flat(name='feed', dataset=FeedPosts,
-             relations=UserRelations, verbs=['podcast'],
+             relations=UserRelations, verbs=['tweet'],
              include_actor=True, max_cache=500)
     ))
 
@@ -46,7 +46,10 @@ def setup_workers(workers=1):
 def setup_database(drop=False):
     """ setup cache and database """
 
-    db.connect()
+    try:
+        db.connect()
+    except Exception as e:
+        print(e)
 
     if drop:
         db.drop_tables(Relation.__subclasses__())
