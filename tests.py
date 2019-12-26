@@ -13,13 +13,15 @@ def create_users(count):
     return list(map(lambda x: uuid4().hex, range(count)))
 
 
-def create_event(verb, publisher_id):
+def create_event(verb, publisher_id, consumer_id=None):
     global item_id
 
     item_id += 1
     timestamp = time() - randint(10, 1000)
     return {
-        'verb': verb, 'producer_id': publisher_id, 'timestamp': timestamp, 'item_id': item_id
+        'verb': verb, 'producer_id': publisher_id,
+        'timestamp': timestamp, 'item_id': item_id,
+        'consumer_id': consumer_id
     }
 
 
@@ -124,6 +126,38 @@ class TestPublish(unittest.TestCase):
 
         for event in events:
             self.assertTrue(int(event['item_id']) in self.event_ids)
+
+
+class TestActivity(unittest.TestCase):
+
+    publisher_1 = "publisher_id_1"
+    publisher_2 = "publisher_id_2"
+    users = create_users(10)
+    events = []
+
+    def test_subscribe(self):
+
+        for user in self.users:
+            self.assertTrue(EventProcessor.subscribe('notification', user, self.publisher_1))
+            self.assertTrue(EventProcessor.subscribe('notification', user, self.publisher_2))
+
+    def test_publish(self):
+
+        user = self.users.pop()
+
+        for publisher in [self.publisher_1, self.publisher_2]:
+            for verb in ['follow', 'like', 'comment', 'mention']:
+                event = create_event(verb, publisher, consumer_id=user)
+                self.events.append(event)
+                EventProcessor.add_event(event)
+
+        sleep(1)
+
+        notifications = list(EventProcessor.consume('notification', user, limit=10))
+
+        self.assertEqual(len(notifications), len(self.events))
+        for item in notifications:
+            self.assertTrue(int(item['item_id']) in list(map(lambda x: x['item_id'], self.events)))
 
 
 if __name__ == '__main__':
