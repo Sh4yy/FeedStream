@@ -434,16 +434,17 @@ class Activity(BaseEvent):
         :return: True on success
         """
         # get items from producer for consumer
-        content_ids = (self._dataset
-                           .select(self._dataset.item_id)
-                           .where(
-                                (self._dataset.producer_id == producer_id) &
-                                (self._dataset.consumer_id == consumer_id)))
+        content_ids = list(self._dataset
+                               .select(self._dataset.item_id)
+                               .where(
+                                    (self._dataset.producer_id == producer_id) &
+                                    (self._dataset.consumer_id == consumer_id))
+                               .dicts())
 
         pipe = redis.pipeline()
         consumer_feed = self.create_cache_name(consumer_id)
         for content_id in content_ids:
-            pipe.zrem(consumer_feed, content_id)
+            pipe.zrem(consumer_feed, content_id['item_id'])
 
         pipe.execute()
         return True

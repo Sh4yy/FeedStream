@@ -144,12 +144,45 @@ class TestActivity(unittest.TestCase):
     def test_publish(self):
 
         user = self.users.pop()
-
+        self.events = []
         for publisher in [self.publisher_1, self.publisher_2]:
             for verb in ['follow', 'like', 'comment', 'mention']:
                 event = create_event(verb, publisher, consumer_id=user)
                 self.events.append(event)
                 EventProcessor.add_event(event)
+
+        sleep(1)
+
+        notifications = list(EventProcessor.consume('notification', user, limit=10))
+
+        self.assertEqual(len(notifications), len(self.events))
+        for item in notifications:
+            self.assertTrue(int(item['item_id']) in list(map(lambda x: x['item_id'], self.events)))
+
+        self.assertTrue(EventProcessor.unsubscribe('notification', user, self.publisher_1))
+        limited_events = list(filter(lambda x: x['producer_id'] != self.publisher_1, self.events))
+
+        sleep(1)
+
+        notifications = list(EventProcessor.consume('notification', user, limit=10))
+        self.assertEqual(len(limited_events), len(notifications))
+
+    def test_retract(self):
+
+        user = self.users.pop()
+
+        self.events = []
+        for publisher in [self.publisher_1, self.publisher_2]:
+            for verb in ['follow', 'like', 'comment', 'mention']:
+                event = create_event(verb, publisher, consumer_id=user)
+                self.events.append(event)
+                EventProcessor.add_event(event)
+
+        sleep(1)
+
+        for event in sample(self.events, k=4):
+            self.events.remove(event)
+            self.assertTrue(EventProcessor.retract_event(event))
 
         sleep(1)
 
