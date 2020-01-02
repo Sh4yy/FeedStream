@@ -85,6 +85,8 @@ class BaseEventStream:
         if consumer_id is not None:
             payload['consumer_id'] = str(consumer_id)
 
+        # todo fix issue in retract
+        # Invalid input of type: 'NoneType'. Convert to a byte, string or number first.
         response = self._post_request('retract', payload=payload)
         return response['retracted']
 

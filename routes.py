@@ -12,7 +12,7 @@ publish_schema = Schema({
 })
 
 retract_schema = Schema({
-    'verb': str, 'producer_id': str, 'event_id': str, Optional('consumer_id'): str
+    'verb': str, 'producer_id': str, 'item_id': str, Optional('consumer_id'): str
 })
 
 consume_schema = Schema({
@@ -44,7 +44,7 @@ def retract(request):
     """ retract an event """
 
     if not retract_schema.is_valid(request.json):
-        abort(400, message='invalid request body')
+        return abort(400, message='invalid request body')
 
     status = EventProcessor.retract_event(request.json)
     return response.json({'ok': True, 'retracted': status})

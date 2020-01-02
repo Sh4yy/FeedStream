@@ -14,9 +14,11 @@ Options:
 from app import setup_web_server
 from docopt import docopt
 
+
 if __name__ == '__main__':
 
     docs = docopt(__doc__)
 
     (setup_web_server(workers=int(docs['--w']))
-        .run(host=docs['--h'], port=int(docs['--p'])))
+        .run(host=docs['--h'], port=int(docs['--p']), debug=True))
+

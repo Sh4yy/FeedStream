@@ -24,7 +24,7 @@ def setup_system():
     # register feeds
     (EventProcessor.register_event_handler(
         Flat(name='feed', dataset=FeedPosts,
-             relations=UserRelations, verbs=['tweet'],
+             relations=UserRelations, verbs=['podcast'],
              include_actor=True, max_cache=500)
     ))
 
