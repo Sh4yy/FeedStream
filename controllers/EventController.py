@@ -44,7 +44,7 @@ class BaseEvent(ABC):
         :param id: target id
         :return: string cache name
         """
-        return f"{id}:{self.name}"
+        return f"fs:{id}:{self.name}"
 
     def clean_excess_from_cache(self, consumer_id):
         """
@@ -132,19 +132,21 @@ class BaseEvent(ABC):
 
 class Flat(BaseEvent):
 
-    def add_event(self, payload):
+    def add_event(self, payload, save=True):
         """
         add a new event
         :param payload: json payload { producer_id, item_id, timestamp, verb }
+        :param save: if True, will save to database
         :return: True on success
         """
         # 1. create a new instance and add to database
-        self._dataset.create(
-            producer_id=payload['producer_id'],
-            item_id=payload['item_id'],
-            timestamp=payload['timestamp'],
-            verb=payload['verb']
-        ).save()
+        if save:
+            self._dataset.create(
+                producer_id=payload['producer_id'],
+                item_id=payload['item_id'],
+                timestamp=payload['timestamp'],
+                verb=payload['verb']
+            ).save()
 
         # 2. fan out process
         self._publish_fan_out_from_producer(
@@ -341,20 +343,22 @@ class Flat(BaseEvent):
 
 class Activity(BaseEvent):
 
-    def add_event(self, payload):
+    def add_event(self, payload, save=True):
         """
         add a new event
         :param payload: json payload
+        :param save: if True will save to db
         :return: True on success
         """
         # 1. create a new instance and add to database
-        self._dataset.create(
-            producer_id=payload.get('producer_id'),
-            consumer_id=payload.get('consumer_id'),
-            verb=payload.get('verb'),
-            timestamp=payload.get('timestamp'),
-            item_id=payload.get('item_id')
-        ).save()
+        if save:
+            self._dataset.create(
+                producer_id=payload.get('producer_id'),
+                consumer_id=payload.get('consumer_id'),
+                verb=payload.get('verb'),
+                timestamp=payload.get('timestamp'),
+                item_id=payload.get('item_id')
+            ).save()
 
         # 2. process fan out
         self._publish_fan_out_from_producer(

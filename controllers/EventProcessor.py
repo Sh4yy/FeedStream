@@ -1,4 +1,5 @@
 from controllers.EventController import *
+from models import *
 
 
 class EventProcessor:
@@ -36,6 +37,23 @@ class EventProcessor:
         return True
 
     @classmethod
+    def preload_data(cls):
+        """
+        preload data into redis
+        :return: True on success
+        """
+
+        models = []
+        models += FlatEvent.__subclasses__()
+        models += ActivityEvent.__subclasses__()
+
+        for model in models:
+            for event in model:
+                cls.add_event(event.make_json(), save=False)
+
+        return True
+
+    @classmethod
     def consume(cls, event_name, consumer_id, limit=20, after=None, before=None):
         """
         consume for consumer
@@ -57,10 +75,11 @@ class EventProcessor:
                             before=before))
 
     @classmethod
-    def add_event(cls, payload):
+    def add_event(cls, payload, save=True):
         """
         register new event
         :param payload: json payload
+        :param save: save event permanently
         :return: True on success
         """
         if 'verb' not in payload:
@@ -68,7 +87,7 @@ class EventProcessor:
 
         for event_handler in cls.event_by_verb[payload['verb']]:
             job = event_handler.add_event
-            cls.task_queue.add_task(job, payload=payload)
+            cls.task_queue.add_task(job, payload=payload, save=save)
 
         return True
 

@@ -2,7 +2,7 @@ from controllers import Activity, Flat, EventProcessor, TaskQueue
 from models import ActivityEvent, FlatEvent, Relation, BaseModel
 from sanic import Sanic
 from routes import mod
-from utils import db
+from utils import db, clear_cache_ns
 
 
 # classes that are required
@@ -43,6 +43,13 @@ def setup_workers(workers=1):
     task_queue.start_workers()
 
 
+def preload_data():
+    """ preloads redis with server data """
+
+    clear_cache_ns('fs')
+    EventProcessor.preload_data()
+
+
 def setup_database(drop=False):
     """ setup cache and database """
 
@@ -66,7 +73,8 @@ def setup_web_server(workers=1):
 
     setup_system()
     setup_workers(workers)
-    setup_database(drop=True)
+    setup_database(drop=False)
+    preload_data()
 
     app = Sanic(__name__)
     app.blueprint(mod)
