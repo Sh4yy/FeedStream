@@ -5,6 +5,7 @@ from redis import StrictRedis
 
 config = Orange('config.json', auto_dump=True, load=True)
 
+
 redis = StrictRedis(
     db=2,
     host=config['redis']['host'],
@@ -16,7 +17,7 @@ db = PostgresqlDatabase(
     host=config['database']['host'],
     port=config['database']['port'],
     user=config['database']['user'],
-    passowrd=config['database'].get('password'))
+    password=config['database'].get('password'))
 
 
 def clear_cache_ns(ns):
