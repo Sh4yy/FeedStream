@@ -15,11 +15,8 @@ db = PostgresqlDatabase(
     config['database']['name'],
     host=config['database']['host'],
     port=config['database']['port'],
-<<<<<<< HEAD
     user=config['database']['user'],
     passowrd=config['database'].get('password'))
-=======
-    user=config['database']['user'])
 
 
 def clear_cache_ns(ns):
@@ -36,4 +33,3 @@ def clear_cache_ns(ns):
         count += 1
     pipe.execute()
     return count
->>>>>>> 6c5da3ddf434825d1f91e3e8f2a443db92043a02
